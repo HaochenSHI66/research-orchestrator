@@ -7,8 +7,11 @@ description: >-
   that writes its detailed output to disk and returns only a compact summary, so
   the main conversation stays clean across a long project. Auto-invokes the
   matching ARIS academic skill for each research stage, persists every plan,
-  design, and artifact under the project's .research/ directory, optionally pulls
-  a second opinion from ChatGPT (via the codex MCP server) for cross-analysis, and loops
+  design, and artifact under the project's .research/ directory, treats every
+  load-bearing claim as unproven until backed by evidence — verifying outcomes,
+  citing fetched sources, and adversarially stress-testing method/formula/design
+  soundness against what top-venue reviewers attack, with a ChatGPT (codex MCP)
+  second opinion — and loops
   autonomously — only pausing at genuine human gates (pick a research direction,
   supply an API key/credential, do an external login, or approve an irreversible
   action). Use this whenever the user wants to start, resume, or push forward a
@@ -38,13 +41,112 @@ output to a file under `.research/` and return only a compact summary.**
 A subagent's return value lands in *your* context. So instruct each one:
 
 > Write your full output (notes, code, logs, drafts, tables) to the file path I
-> give you under `.research/`. Return to me ONLY: (1) a ≤200-word summary of what
-> you found/did, (2) the artifact file path(s), (3) any decision the orchestrator
-> now needs to make, (4) a confidence/risk flag. Do not paste long content back.
+> give you under `.research/`. Return to me ONLY: (1) a ≤200-word summary, (2) the
+> artifact file path(s), (3) **evidence for each load-bearing claim** — a file:line
+> quote, the actual command output, or a fetched URL — each with a provenance tag
+> `[verified]`/`[sourced]`/`[assumption]`, (4) which skills/tools you actually used,
+> (5) any decision the orchestrator now needs, (6) a confidence/risk flag. Don't
+> paste long content back — but do paste the short evidence.
 
 This is what keeps the main conversation readable over a months-long project.
 You read the summary, append it to the state log, and move on. The detail is
 safely on disk if you ever need a subagent to go re-read it.
+
+## The second rule: evidence over assertion
+
+A subagent's summary is a *claim*, not proof. "I invoked aris-paper-write", "the
+design is sound", "this beats the baseline", "the deadline is X" — every one can be
+wrong or fabricated, and once you record it into STATE as fact, the whole project
+inherits an error you can no longer see. So:
+
+**Nothing load-bearing enters STATE, a design, or a decision as fact until it is
+backed by evidence. No claim is exempt because it is cheap or convenient.**
+
+You cannot verify a subagent's *process* — whether it really ran a skill or really
+read a file. Don't try. Verify the two things you can:
+
+1. **Outcomes** — re-checkable results. A test passes (run it / read the run log).
+   A file contains X (quote it, `file:line`). Code imports (import it). The question
+   is never "did you invoke the skill?" but "is the output correct?" — whether
+   `aris-paper-write` literally ran matters far less than whether the section it
+   produced is right, and *that* you can check.
+2. **Sources** — claims about the outside world (venue rules, deadlines, page
+   limits, SOTA numbers, "X is the closest prior work", novelty) must cite a source
+   actually fetched this session (WebFetch/WebSearch). A claim from model memory is
+   an **assumption**, not a fact — label it, then verify it or gate on it.
+
+### Provenance tags
+
+In summaries, STATE, and decisions, tag each load-bearing claim `[verified: how]`,
+`[sourced: url]`, or `[assumption: model-prior]`. An `[assumption]` may never be
+silently promoted to fact. The dispatch contract requires subagents to return
+*evidence* (a quote, the command output, the URL) and the skills/tools they
+actually used — not bare assertions.
+
+### Method, formulas, and design choices are guilty until proven principled
+
+This is where top-venue reviewers do the most damage, so it gets the strongest
+check. Any claim that the experimental design is sound, a formula correct, a loss
+weight / margin / temperature / schedule / threshold justified, or the contribution
+novel and uncontroversial — is **never self-certified**. For each, dispatch an
+independent subagent to *attack* it, AND run a codex cross-analysis to attack it
+from a second model. "Sound" means *survived a genuine refutation attempt*, not
+"the author asserted it".
+
+Aim the attack at what reviewers actually attack — see
+`references/reviewer-attack-checklist.md` (grounded in real NeurIPS/ICML/ICLR/CVPR/
+ACL/WSDM reviewer guidelines + the methodology literature): arbitrary design
+constants with no derivation, sensitivity sweep, or ablation; gains that come from
+tuning/compute rather than the idea; single-run results with no seeds/significance;
+weak or untuned baselines; data leakage; overclaiming beyond the evidence; missing
+closest prior work. Every load-bearing design choice needs a derivation **or** a
+sensitivity sweep + an ablation that removes it — if neither exists, that is a
+finding, not a detail.
+
+### The verification ledger and the no-pass gate
+
+Track every load-bearing claim in `.research/verification-ledger.md` with its status
+(`verified` / `sourced` / `unverified` / `refuted`) and an evidence pointer (see
+`references/workspace-layout.md`). **Hard rule: take no expensive or irreversible
+action — spending compute, pushing, submitting, or telling the user a conclusion —
+while a load-bearing claim it depends on is still `unverified` or `refuted`.**
+Resolve it first (verify it, or surface it to the user as an explicit assumption to
+sign off on). An unverified load-bearing claim is itself a human gate.
+
+## Held to top CS-venue standards — non-negotiables
+
+Everything in this project is held to the submission bar of a top CS conference
+(NeurIPS / ICML / ICLR / CVPR / ACL / KDD / WSDM). These are gates, not aspirations.
+
+- **Data integrity — zero fabrication.** Every number that will appear in the paper
+  must come from a real run on real data, trace to a concrete artifact (log / results
+  file / checkpoint) on disk, and be reproducible from a recorded command + config +
+  seed. No invented, "expected", rounded-up, or placeholder numbers ever enter a
+  draft — if a number isn't backed by an artifact yet, the cell stays TODO, never a
+  guess. No exaggeration: report what the result is, including where it is weak.
+- **Every design must be implemented.** Never describe a method component, loss, or
+  module in the paper that is not actually built and run. The paper describes the code
+  that *exists*, not the code you wish existed. Before a method claim ships, point to
+  the implementation and the run that exercised it.
+- **Design / experiments / formulas: both must confirm (双方确认).** Every design
+  choice, experimental protocol, and formula is confirmed by BOTH an independent
+  refutation subagent AND a codex cross-analysis. Agreement of *both* is the bar; if
+  either refutes, it stays unresolved (see the soundness rule above + the codex section).
+- **References: download and verify.** Every citation is verified real *and*
+  claim-supported by downloading the actual PDF and checking the text — see
+  `references/citation-verification.md`. A draft never ships with a NOT-FOUND,
+  METADATA-MISMATCH, or CLAIM-UNSUPPORTED reference.
+- **Figures and tables earn their place.** Use the user's fixed plotting skill
+  `paper-plot-from-data` for ALL figures so style and color palette stay consistent —
+  never hand-roll ad-hoc matplotlib styling. Each figure/table must make one clear,
+  hard-to-dispute point the prose actually uses; the set must be *diverse* (schematic,
+  quantitative, ablation, qualitative/failure, convergence — not repetitive); and the
+  count must fit venue norms (~5–8 high-value floats in an 8–9pp paper). Dispatch
+  figures to a subagent and confirm with codex, like any design choice. See
+  `references/figure-discipline.md`.
+
+When any of these can't be met yet, that is a finding or a human gate — not something
+to paper over.
 
 ## First moves when invoked
 
@@ -161,16 +263,27 @@ ChatGPT's take through the **codex MCP server** (`mcp__codex__codex`).
 - Call it read-only and non-interactive so it can't touch files or stall on
   approvals: pass `sandbox: "read-only"` and `approval-policy: "never"`. Put the
   material to analyze directly in `prompt` (read the file first and inline it).
-  Optionally pin `model` (e.g. `gpt-5.2`); otherwise codex uses its default.
+- **Model: use `gpt-5.5` at xhigh reasoning** — pass `model: "gpt-5.5"` and
+  `config: {"model_reasoning_effort": "xhigh"}`. (`gpt-5.5-codex` is rejected on
+  ChatGPT-auth accounts — if you ever hit a model-not-supported error, fall back to
+  `gpt-5.5` and report which you used.) This is the strongest available reviewer;
+  high-stakes soundness checks deserve it.
 - Use it as a *check on your own work*, not a replacement for it. Form your own
   view first, then see where ChatGPT diverges. Disagreement is the signal.
+- **Required, not optional, for soundness.** Any claim that the method/design is
+  sound, a formula correct, a design constant justified, or the contribution novel
+  must get this codex cross-analysis *paired with an independent refutation
+  subagent* — see "Method, formulas, and design choices are guilty until proven
+  principled" above. Prompt codex to *refute*, not to praise.
 
 Instruct the subagent roughly:
 ```
 1. ToolSearch "select:mcp__codex__codex" to load the tool.
 2. Read .research/designs/exp-design-v2.md.
 3. Call mcp__codex__codex with:
-     prompt: "You are a skeptical research collaborator giving a second opinion.
+     model: "gpt-5.5"
+     config: {"model_reasoning_effort": "xhigh"}
+     prompt: "You are a skeptical top-venue reviewer giving a second opinion.
               Critique this experimental design for confounds and missing
               baselines; name the closest prior work. Prioritize disagreement and
               actionable fixes over praise.\n\n<inlined design doc>"
@@ -209,14 +322,21 @@ You are working on the research project at <project root>.
 Context: <2-3 sentences — the subagent can't see the main conversation>.
 Task: <the specific, bounded unit of work>.
 Skill to use: invoke `<aris-skill>` for this. If it doesn't fit, pick the
-  closest available skill and tell me which.
+  closest available skill and tell me which you used.
+Verify, don't assume: treat any "fact" in this brief as a hypothesis — check it
+  against reality and correct me if it's wrong. Back every load-bearing claim with
+  evidence (a file:line quote, the actual command output, or a fetched URL) and a
+  provenance tag [verified]/[sourced]/[assumption]. Do not assert external facts
+  from memory — fetch and cite them, or mark them [assumption].
 Write your full output to: <.research/...path...>
 Return to me ONLY:
   1. A ≤200-word summary of what you found/did.
   2. The artifact path(s) you wrote.
-  3. Any decision the orchestrator now needs to make.
-  4. A confidence/risk flag (and anything that blocks progress).
-Do NOT paste long content back — it goes in the file, not your reply.
+  3. Evidence + provenance tag for each load-bearing claim, and the skills/tools
+     you actually used.
+  4. Any decision the orchestrator now needs to make.
+  5. A confidence/risk flag (and anything that blocks progress).
+Do NOT paste long content back — but DO paste the short evidence.
 ```
 
 Pick the subagent type by task: `general-purpose`/`Explore` for search and
@@ -232,3 +352,8 @@ state. Report outcomes faithfully: if a subagent's experiment failed, say so wit
 the evidence; if a step was skipped, say why. Never report a step as complete on
 the strength of a subagent summary you haven't sanity-checked against the artifact
 it claims to have written.
+
+And you are never "done" with an open `unverified`/`refuted` load-bearing claim in
+`.research/verification-ledger.md` that the result depends on. Ledger-clean (or the
+user has signed off on the remaining items as explicit assumptions) is part of the
+definition of done.

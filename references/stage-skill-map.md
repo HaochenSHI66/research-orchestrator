@@ -44,3 +44,15 @@ process skills.
   high-level stage work.
 - When unsure, the subagent should state which skill it used and why, so the
   orchestrator can correct the mapping on the next step.
+
+## Cross-cutting verification references
+
+These apply on top of the stage skills, per the top-venue standards in SKILL.md:
+
+- **Citations** → `references/citation-verification.md` — download the real PDF and
+  confirm the cited claim; wire `aris-arxiv` (download) + `aris-citation-audit`
+  (claim audit) + `flonat-bib-validate --verify-doi` (cheap existence pre-gate).
+- **Figures/tables** → `references/figure-discipline.md` — use `paper-plot-from-data`
+  for ALL figures (fixed styles/palette); justified + diverse + venue-appropriate count.
+- **Reviewer attacks** → `references/reviewer-attack-checklist.md` — what to stress-test
+  every design/experiment/claim against before it's considered sound.

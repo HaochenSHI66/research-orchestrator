@@ -5,18 +5,45 @@ Every research project gets a `.research/` directory at its root. This is where
 
 ```
 .research/
-├── STATE.md            # short, always-current. The FIRST thing every session reads.
-├── plan.md             # living master plan: steps, status, follow-ups.
-├── designs/            # design docs, proposals, method writeups. Versioned, never overwritten.
-├── decisions/          # one entry per human-gate decision (options, choice, rationale).
-├── artifacts/          # subagent working outputs: search results, logs, tables, drafts.
-└── chatgpt/            # ChatGPT (OpenAI API) cross-analysis exchanges.
+├── STATE.md                 # short, always-current. The FIRST thing every session reads.
+├── plan.md                  # living master plan: steps, status, follow-ups.
+├── verification-ledger.md   # every load-bearing claim + status + evidence pointer.
+├── designs/                 # design docs, proposals, method writeups. Versioned, never overwritten.
+├── decisions/               # one entry per human-gate decision (options, choice, rationale).
+├── artifacts/               # subagent working outputs: search results, logs, tables, drafts.
+└── chatgpt/                 # codex (ChatGPT) cross-analysis exchanges.
 ```
 
-`.research/` is a working/process directory. If the project is a git repo, suggest
-adding `.research/artifacts/` and `.research/chatgpt/` to `.gitignore` if they get
-large, but keep `STATE.md`, `plan.md`, `designs/`, and `decisions/` tracked — those
-are the record. Confirm with the user before changing `.gitignore`.
+`.research/` is a working/process directory. **Add it to `.gitignore` by default** —
+its artifacts and chatgpt exchanges can capture secrets (server passwords, tokens) and
+large blobs, and must never be pushed to a shared repo without scrubbing. If you want
+the record tracked, track only `STATE.md`, `plan.md`, `verification-ledger.md`,
+`designs/`, and `decisions/`, and scrub secrets first. Confirm with the user before
+changing `.gitignore`.
+
+## verification-ledger.md template
+
+The anti-fabrication backbone. Every load-bearing claim — a reported number, a design
+choice, a cited reference, a "this is implemented" claim, an external fact — gets a
+row. Nothing expensive or irreversible happens while a row it depends on is
+`unverified` or `refuted`.
+
+```markdown
+# <Project> — Verification Ledger
+_Last updated: <date>_
+
+| Claim | Type | Status | Evidence | Notes |
+|---|---|---|---|---|
+| SFT CER = 0.61 | result-number | verified | results/seed42/eval.json:12 + rerun cmd | 3-seed mean |
+| LR=2e-4 right for r64 QLoRA | design-choice | refuted | codex+subagent: needs sweep | run sensitivity sweep |
+| "[12] is closest prior work" | citation | sourced | arXiv:2401.xxxx PDF p.4, claim-matched | VERIFIED |
+| Verifier L3 is implemented | design-impl | verified | src/pipeline/l3_rules.py + passing test | |
+| WSDM 2027 deadline = <date> | external-fact | unverified | nothing fetched yet | GATE: fetch+cite |
+
+Status: verified (re-checkable outcome) · sourced (fetched URL) · unverified
+(assumption, not yet checked) · refuted (failed a check — must fix). "Load-bearing"
+= the paper or a decision depends on it.
+```
 
 ## STATE.md template
 
