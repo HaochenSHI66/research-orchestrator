@@ -138,10 +138,16 @@ Everything in this project is held to the submission bar of a top CS conference
   METADATA-MISMATCH, or CLAIM-UNSUPPORTED reference.
 - **Figures and tables earn their place.** Use the user's fixed plotting skill
   `paper-plot-from-data` for ALL figures so style and color palette stay consistent —
-  never hand-roll ad-hoc matplotlib styling. Each figure/table must make one clear,
-  hard-to-dispute point the prose actually uses; the set must be *diverse* (schematic,
-  quantitative, ablation, qualitative/failure, convergence — not repetitive); and the
-  count must fit venue norms (~5–8 high-value floats in an 8–9pp paper). Dispatch
+  never hand-roll ad-hoc matplotlib styling. For venue-exact figure sizing (pt-level),
+  layer `tueplots` on top (`~/paper-figure-code/frameworks/tueplots/`); for journal
+  styles (Nature/IEEE/Science), use `SciencePlots`
+  (`~/paper-figure-code/frameworks/SciencePlots/`). Each figure/table must make one
+  clear, hard-to-dispute point the prose actually uses; the set must be *diverse*
+  (schematic, quantitative, ablation, qualitative/failure, convergence — not repetitive);
+  and the count must fit venue norms (~5–8 high-value floats in an 8–9pp paper).
+  **Tables follow the LaTeX design standards in `references/figure-discipline.md`
+  PART D** (booktabs structure, `\rowcolor{lightgreen}` for proposed method,
+  three-tier headers, captions above, `\resizebox{\linewidth}{!}{}`). Dispatch
   figures to a subagent and confirm with codex, like any design choice. See
   `references/figure-discipline.md`.
 
@@ -159,11 +165,74 @@ to paper over.
 3. **Reconcile.** Compare what `STATE.md` says against reality (git log, files on
    disk, the user's message). If they disagree, surface it — don't blindly trust
    the state file. Update `STATE.md` to match reality.
+3b. **Run the competitive intelligence sweep** if `STATE.md` does not already record
+    `competitive-sweep: done` (i.e., new project or topic pivot). See the
+    "Competitive intelligence sweep" section below. This must complete — and the
+    positioning map must be written — before you present any direction choice to
+    the user.
 4. **Decide the next step**, then enter the loop below.
 
 Always start by reading the current state. Skills and code evolve between
 sessions; the state file is the source of truth for *intent*, the filesystem for
 *fact*.
+
+## Competitive intelligence sweep — mandatory before any direction gate
+
+A direction chosen without surveying the existing literature inherits unknown
+competitive risk. This sweep runs once per project (or once per topic pivot) and
+feeds the direction-choice human gate. Never silently pick a direction — always
+present the positioning map first.
+
+**Step 1 — Identify target venues.** Dispatch a subagent to identify the top 2–3
+conferences/journals for the proposed area and record them in
+`.research/competitive-sweep/venues.md`.
+
+**Step 2 — Parallel paper collection.** Dispatch 3–5 subagents **in parallel**,
+each covering a different keyword angle, using `aris-semantic-scholar`,
+`aris-openalex`, and `aris-arxiv`. Coverage window: past 3 years at the
+identified venues. Each subagent downloads the top 5–8 matching PDFs and lists
+them (title, venue, year, arXiv ID / DOI) in `.research/competitive-sweep/`.
+
+**Step 3 — Per-paper analysis fan-out.** For each collected PDF (cap at 20;
+prioritize by venue tier and recency), dispatch one subagent per paper to
+extract and write to `.research/competitive-sweep/papers/<id>.md`:
+- Core contribution claim (1–2 sentences)
+- Method backbone (architecture, objective, key design choices)
+- Benchmarks and metrics used (names, splits, evaluation protocol)
+- Main results vs. baselines (key numbers)
+- Stated limitations and open problems
+
+Run these concurrently — they are fully independent.
+
+**Step 4 — Synthesis and positioning map.** One synthesis subagent reads all
+per-paper analyses and writes `.research/competitive-sweep/positioning-map.md`:
+- Contribution space table: paper × {contribution axis, benchmark, venue, year}
+- Explicit verdict on the proposed direction with one of:
+  - **(a) Direct overlap** — names the existing paper(s)
+  - **(b) Competitive risk** — names parallel work + time-to-publish estimate
+  - **(c) Gap filler** — which gap, supported by which papers' limitations sections
+  - **(d) Novel axis** — what makes it novel and why prior work doesn't cover it
+- **Benchmark recommendation**: which existing benchmarks can measure the key
+  contribution (prefer reuse); if none, which metric is missing and why.
+
+**Step 5 — Human gate.** Present the positioning map to the user with the
+direction options. This is always a human gate; never pick silently.
+
+**Step 6 — Record.** After the user picks, write the decision (options + rationale)
+to `.research/decisions/direction-choice.md` and set `competitive-sweep: done` in
+`STATE.md`.
+
+### Benchmark evaluation decision (flows from the positioning map)
+
+**Rule: reuse existing benchmarks unless provably insufficient.** Reusing standard
+benchmarks makes results directly comparable to prior work and pre-empts a common
+reviewer objection. A new evaluation protocol is justified only when:
+- Existing benchmarks don't measure the claimed contribution (articulate which
+  aspect is unmeasured and why it matters), OR
+- The contribution introduces a new task/setting where no benchmark exists yet.
+
+If a new protocol is needed → human gate before designing it. If existing
+benchmarks apply → record the choice in STATE and proceed without stopping.
 
 ## The loop
 
@@ -202,8 +271,12 @@ when you hit one of these**, because here a wrong guess is expensive or
 irreversible and only the user can resolve it:
 
 - **Direction choice.** Multiple viable research directions / framings / methods,
-  and the choice materially changes everything downstream. Present the options
-  with tradeoffs; don't pick silently.
+  and the choice materially changes everything downstream. Always present the
+  competitive-sweep positioning map alongside the options; don't pick silently.
+- **Benchmark evaluation protocol.** The competitive sweep shows no existing
+  benchmark can measure the claimed contribution → confirm with the user before
+  designing a custom evaluation. If existing benchmarks apply, record the choice
+  and continue without stopping.
 - **Credentials / API keys.** A step needs a key or secret you don't have (e.g. a
   dataset token, a cluster login), or the codex MCP server isn't authenticated/
   available for ChatGPT cross-analysis. Ask for it; don't fake or skip the step.

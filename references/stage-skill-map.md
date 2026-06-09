@@ -25,7 +25,8 @@ process skills.
 | Results analysis | `aris-analyze-results`, `aris-result-to-claim` | `arl-data-analysis`, `scholar-results-analysis`, `sci-statistical-analysis` |
 | Claims drafting | `aris-claims-drafting`, `aris-result-to-claim` | — |
 | Figures / diagrams | `aris-paper-figure`, `aris-paper-illustration`, `aris-mermaid-diagram` | `paper-plot-from-data`, `paper-plot-from-image`, `arl-figure-generation` |
-| Tables | — | `arl-table-generation` |
+| Competitive intel sweep | `aris-semantic-scholar`, `aris-openalex`, `aris-arxiv` | Fan-out per-keyword → per-paper analysis → positioning map; see "Competitive intelligence sweep" in SKILL.md |
+| Tables | — | `arl-table-generation`; **LaTeX standards → `references/figure-discipline.md` PART D** (booktabs + rowcolor + three-tier headers) |
 | Paper writing | `aris-paper-write`, `aris-paper-plan`, `aris-paper-compile` | `arl-paper-writing-section`, `scholar-ml-paper-writing`, `20-ml-paper-writing`, `paper-writer-imrad` |
 | Citation / claim audit | `aris-citation-audit`, `aris-paper-claim-audit` | `scholar-citation-verification`, `aw-paper-audit` |
 | Self-review before submit | `aris-research-review`, `aris-auto-review-loop` | `scholar-paper-self-review`, `arl-self-review`, `feedback-review-paper` |

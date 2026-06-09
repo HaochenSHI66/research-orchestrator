@@ -151,3 +151,112 @@ Codex's main DISAGREEMENTS / corrections:
 5. Don't cargo-cult diversity — repetition is fine when it's the cleanest comparison.
 
 Codex's top ADDITIONS (already folded into A3 checklist): self-contained captions; show uncertainty/significance; axis honesty; efficiency/compute Pareto plots; qualitative selection discipline incl. failures; table discipline; accessibility/colorblind-safe; main claims need main-paper evidence; reviewer-facing traceability.
+
+---
+
+## PART D — Table LaTeX Design Standards
+
+Sourced from: ICLR 2026 paper "Ensembling Pruned Attention Heads For Uncertainty-Aware Efficient Transformers" (U2IS / ENSTA / Institut Polytechnique de Paris), arXiv:2510.18358 [verified: LaTeX source downloaded directly from arXiv e-print]. Tables in this paper passed top-venue review and represent the canonical NeurIPS/ICLR table template.
+
+### Required packages
+
+```latex
+\usepackage{booktabs}        % \toprule \midrule \bottomrule \cmidrule(lr){}
+\usepackage{array}           % column spec extensions
+\usepackage{multirow}        % \multirow[c]{n}{*}{...}
+\usepackage[normalem]{ulem}  % \underline (second-best; normalem = don't break \emph)
+\usepackage{colortbl}        % \rowcolor
+\definecolor{lightgreen}{rgb}{0.76, 0.88, 0.76}   % proposed-method row highlight
+```
+
+### Structural template (main-results table)
+
+```latex
+\begin{table}[!t]
+\centering
+\caption{\textbf{Short imperative title.} One sentence: dataset/split, metric direction.
+Best in \textbf{bold}, second-best \underline{underlined}.}
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.15}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{l c c c @{\hspace{4pt}\vrule\hspace{2pt}\vrule\hspace{4pt}} c c c}
+\toprule
+% Three-tier header: dataset (large scshape) → metric group → individual metric ↑/↓
+\multirow[c]{3}{*}{\large\textbf{Method}} &
+\multicolumn{3}{c}{\textbf{\large\scshape Dataset A}} &
+\multicolumn{3}{c}{\textbf{\large\scshape Dataset B}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\multicolumn{1}{c}{Acc} & \multicolumn{2}{c}{OOD Avg} &  ...  \\
+\cmidrule(lr){3-4}\cmidrule(lr){...}
+ & $\uparrow$ & $\uparrow$ & $\downarrow$ & $\uparrow$ & $\uparrow$ & $\downarrow$ \\
+\midrule
+Baseline          & 84.1 & 45.2 & 12.3 & 82.0 & 44.1 & 13.5 \\
+\rowcolor{lightgreen} \textsc{Our Method} & \textbf{86.3} & \underline{47.6} & \textbf{10.1} & \textbf{84.5} & \textbf{46.8} & \underline{11.2} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+```
+
+### Convention table
+
+| Convention | Rule |
+|---|---|
+| Caption position | **Above** the table — always |
+| Caption structure | `\textbf{Short title.}` then dataset/split/metric-direction. End with "Best in bold, second-best underlined." |
+| Proposed method row | `\rowcolor{lightgreen}` (rgb 0.76/0.88/0.76) |
+| Method names | `\textsc{Small Caps}` throughout |
+| Best value | `\textbf{bold}` |
+| Second-best value | `\underline{underlined}` |
+| Horizontal rules | `\toprule` / `\midrule` / `\bottomrule` (booktabs); `\cmidrule(lr){i-j}` for sub-headers |
+| Dataset column separator | `@{\hspace{4pt}\vrule\hspace{2pt}\vrule\hspace{4pt}}` (double vertical rule) |
+| Auto-scaling | `\resizebox{\linewidth}{!}{}` wrapper always |
+| Spacing | `\tabcolsep=3pt`, `\arraystretch=1.15` |
+| Metric direction | `$\uparrow$` / `$\downarrow$` in each column header |
+| Significance / p-values | Not in main tables — move to appendix or omit |
+| ±std (appendix) | `\newcommand{\res}[2]{#1{\scriptsize\textcolor{blue!60}{$\pm$#2}}}` |
+| Inline delta (appendix) | `(\textcolor{green}{+0.34})` for improvement over baseline |
+
+### Why these patterns satisfy reviewers
+
+- `\cmidrule(lr){}` trimmed rules → prevents "table looks cluttered" critique
+- `\rowcolor` → proposed method scannable at a glance without relying on text weight alone
+- Three-tier headers with `\scshape` dataset names → multi-dataset comparison legible in one look
+- Captions **above** (not below) → matches ICLR/NeurIPS reviewer skim direction
+- `\resizebox` → prevents overfull hbox across varying column counts
+- `\arraystretch=1.15` → enough breathing room without wasting vertical space
+
+---
+
+## PART E — Plotting frameworks toolkit (`~/paper-figure-code/`)
+
+The user maintains a curated plotting toolkit at `~/paper-figure-code/`. These
+supplement (not replace) the `paper-plot-from-data` style scripts.
+
+| Need | Tool | Path |
+|---|---|---|
+| Venue-exact figure size (pt-level): NeurIPS/ICML/CVPR/ICLR/ECCV/AAAI | `tueplots` | `~/paper-figure-code/frameworks/tueplots/` |
+| One-line journal style: Nature / IEEE / Science | `SciencePlots` | `~/paper-figure-code/frameworks/SciencePlots/` |
+| SVG/PDF output for Illustrator/Inkscape editing | `LovelyPlots` | `~/paper-figure-code/frameworks/LovelyPlots/` |
+| Nature Reviews style + `make_nature_figure()` | `sciplotlib` | `~/paper-figure-code/frameworks/sciplotlib/` |
+| Size constants only (NeurIPS/ICML/ICLR/Informatics) | `mpl_sizes` | `~/paper-figure-code/frameworks/mpl_sizes/` |
+| Real ML training curve with line style / alpha tutorial | tutorial | `~/paper-figure-code/tutorials/deep_learning_plotting_example/` |
+| Annotated technique tutorial (boxplot, fill_between, spines) | tutorial | `~/paper-figure-code/tutorials/matplotlib_for_papers/` |
+| Real multi-method bar chart (GPT-4-LLM instruction tuning) | paper script | `~/paper-figure-code/papers/GPT-4-LLM/plots/` |
+| Scaling-law log-log iso-FLOP curves | paper script | `~/paper-figure-code/papers/Minchilla/plot_isoflops.py` |
+
+**Recommended layering order:**
+1. Set figure SIZE with `tueplots`: `plt.rcParams.update(bundles.neurips2023())` (or iclr/icml/cvpr/etc.)
+2. Apply color/style with `paper-plot-from-data` script (keep palette consistent)
+3. Export at `dpi=300` PNG (or SVG via `LovelyPlots` if post-processing needed)
+
+**Never** set raw `figsize` manually — always derive from `tueplots` so the figure
+renders at the correct column width in the LaTeX template.
+
+**Journal style shortcut:**
+```python
+import scienceplots
+plt.style.use(['science', 'nature'])          # Nature/Science journal
+plt.style.use(['science', 'ieee'])            # IEEE single-column
+plt.style.use(['science', 'bright'])          # colorblind-safe, any venue
+plt.style.use(['science', 'no-latex'])        # when LaTeX not installed
+```
