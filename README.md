@@ -3,9 +3,9 @@
 # research-orchestrator
 
 **A Claude Code skill that runs research projects as a lean orchestrator.**  
-The main thread only plans and decides — all work is delegated to subagents  
-that write to disk and return compact summaries, so your conversation stays  
-navigable months into a project.
+The main thread only plans, dispatches, verifies, and records — never does research work itself.  
+All work is delegated to subagents that write to disk and return compact summaries, so your  
+conversation stays navigable months into a project.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-blueviolet)](https://claude.ai/code)
@@ -15,11 +15,38 @@ navigable months into a project.
 
 ---
 
+## Contents
+
+- [The problem](#the-problem)
+- [Install](#install)
+- [How it works](#how-it-works)
+- [What it does](#what-it-does)
+- [Design principles](#design-principles)
+  - [Evidence-gating](#evidence-gating----nothing-enters-state-as-fact-without-proof)
+  - [Citation PDF verification](#citation-pdf-verification----every-reference-is-downloaded-and-checked)
+  - [ChatGPT cross-analysis](#chatgpt-cross-analysis----adversarial-second-opinion-for-high-stakes-decisions)
+  - [Human gates](#human-gates----autonomous-loop-with-hard-stops-at-irreversible-decisions)
+  - [Clean main thread](#clean-main-thread----the-orchestrator-never-does-the-work)
+  - [Persistent workspace + TODO](#persistent-workspace--running-todo----single-source-of-truth-across-all-sessions)
+  - [Competitive intelligence sweep](#competitive-intelligence-sweep----no-direction-chosen-blind)
+  - [Venue-standard quality + figures](#venue-standard-quality--figure-discipline----held-to-neuripsicmlcvpracl-bar)
+- [Evidence system](#evidence-system)
+- [Competitive intelligence sweep](#competitive-intelligence-sweep)
+- [Human gates](#human-gates)
+- [Workspace](#workspace)
+- [Academic skills](#academic-skills)
+- [Requirements](#requirements)
+- [Repo layout](#repo-layout)
+- [Limitations](#limitations)
+- [License](#license)
+
+---
+
 ## The problem
 
-Research projects are long. If you run literature reviews, write experiment code, parse training logs, and draft paper sections in one conversation, the context fills with detail that's irrelevant to the *next* decision — and 30 steps in, you've lost the thread of the whole project.
+Long research projects break single-conversation LLM sessions: context fills with irrelevant detail, and 30 steps in you've lost the thread.
 
-`research-orchestrator` flips this. **The main thread holds the plan. Subagents hold the mess.** Every task — a literature search, an experiment run, a paper section, a citation audit — is dispatched to a subagent that writes its full output to disk and returns only a ≤200-word summary. The conversation stays clean. The detail is safe on disk. You can still see the forest 50 steps in.
+`research-orchestrator` fixes this by keeping the main thread plan-only. Every task dispatches to a subagent that writes full output to disk and returns only a ≤200-word summary.
 
 ---
 
@@ -72,15 +99,12 @@ This contract is what keeps the main thread clean. A subagent's full notes, code
 
 | | |
 |---|---|
-| **Clean main thread** | All literature search, experiment code, analysis, and writing goes to subagents. You see summaries; detail lives on disk. |
-| **Persistent workspace** | Plans, designs, and decisions — including options that lost — are all kept under `.research/`. Every session reads `STATE.md` first. |
-| **Running TODO** | `TODO.md` is updated every loop iteration with status, locked decisions, and open questions — a single source of truth for the whole project. |
-| **Stage → skill mapping** | Each research stage auto-maps to the matching ARIS academic skill. Ideation, literature, experiments, writing, review, rebuttal — all covered. |
-| **Evidence-gated** | Nothing load-bearing enters STATE as fact without a file quote, command output, or fetched URL. Claims are tagged `[verified]`, `[sourced]`, or `[assumption]`. |
-| **Competitive sweep** | Before any direction choice, the orchestrator fans out parallel subagents to map the existing literature and surface direct overlap, competitive risk, and open gaps. |
-| **Venue-standard verification** | Every design choice, formula, and result is stress-tested against what NeurIPS/ICML/ICLR/CVPR/ACL reviewers actually attack: unjustified constants, weak baselines, single-run results, missing ablations, fabricated numbers. |
-| **ChatGPT cross-analysis** | High-stakes judgment calls (novel? sound? claim follows?) get an independent second opinion from GPT-5.5 via the codex MCP server, saved to `.research/chatgpt/`. |
 | **Autonomous loop** | Runs through ordinary work without stopping. Pauses only at genuine human gates: direction choices, missing credentials, interactive logins, irreversible actions. |
+| **Persistent workspace** | Plans, designs, and decisions — including options that lost — are all kept under `.research/`. Every session reads `STATE.md` first. |
+| **Running TODO** | `TODO.md` is updated every loop iteration with status, locked decisions, and open questions — single source of truth for the whole project. |
+| **Stage → skill mapping** | Each research stage auto-maps to the matching ARIS academic skill. Ideation, literature, experiments, writing, review, rebuttal — all covered. |
+| **ChatGPT cross-analysis** | Required (not optional) for any soundness claim — novel? sound? claim follows from results? Runs via codex MCP at `xhigh` reasoning, saved to `.research/chatgpt/`. |
+| **Competitive sweep** | Before any new direction, fans out parallel subagents to map existing literature and surface direct overlap, competitive risk, and open gaps. |
 
 ---
 
@@ -300,9 +324,10 @@ The orchestrator never invokes these itself — it tells each dispatched subagen
 
 ## Requirements
 
-- **Claude Code** with the `Agent` tool (subagent support required)
-- **ARIS skills** *(recommended)* — see [academic skills](#academic-skills) for fallback behavior
-- **codex MCP server** *(optional)* — for ChatGPT cross-analysis; absence triggers a human gate rather than a silent skip
+- **Claude Code** with the `Agent` tool — *required*; without subagent support the skill is non-functional
+- **ARIS skills** — *recommended*; without them falls back to `scholar-*` / `arl-*` / `phd-*` or generic subagents; literature depth and review quality degrade
+- **codex MCP server** — *required for autonomous soundness decisions*; without it every novelty/design-validity check becomes a human gate the loop cannot pass autonomously
+- **Network + PDF access** — *required* for citation verification, arXiv/Semantic Scholar sweeps, and Unpaywall downloads; air-gapped environments will trigger gate pauses
 
 ---
 
@@ -319,6 +344,17 @@ research-orchestrator/
 │   └── citation-verification.md     ← citation verification protocol
 └── README.md
 ```
+
+---
+
+## Limitations
+
+- **Token cost**: the competitive sweep fans out 3–5 parallel subagents each downloading and parsing PDFs; a full direction sweep can cost $5–20 in API tokens. Complex stages (review loop, ablation planning) with many concurrent subagents can push a full session past $50.
+- **codex MCP is a hard dependency for soundness**: without it, any soundness-critical decision (novelty, design validity, claim follows from results) becomes a human gate — the loop cannot proceed autonomously past it.
+- **Subagent summaries are not guaranteed accurate**: if a subagent hallucinates or misreads a paper, the error propagates unless evidence-gating catches it. The ledger and provenance tags reduce this risk but do not eliminate it.
+- **Network and PDF access required**: citation verification, literature sweeps, and Unpaywall downloads all require outbound internet; paywalled papers fall back to `EXISTS-BUT-UNCHECKED` status.
+- **Long projects accumulate state**: after many sessions, `.research/` can grow large; periodic manual archiving of `artifacts/` and completed decisions is recommended.
+- **No automatic rollback**: the workspace records everything but does not version-control it automatically; corrupted `STATE.md` or design docs require manual recovery.
 
 ---
 

@@ -124,10 +124,20 @@ Everything in this project is held to the submission bar of a top CS conference
   seed. No invented, "expected", rounded-up, or placeholder numbers ever enter a
   draft — if a number isn't backed by an artifact yet, the cell stays TODO, never a
   guess. No exaggeration: report what the result is, including where it is weak.
-- **Every design must be implemented.** Never describe a method component, loss, or
-  module in the paper that is not actually built and run. The paper describes the code
-  that *exists*, not the code you wish existed. Before a method claim ships, point to
-  the implementation and the run that exercised it.
+  Every experiment artifact must record the following provenance fields:
+  - `git_commit` — exact commit hash of the code that produced the result
+  - `command` — full command line (or script path) and config file used
+  - `seed` — all random seeds set (model init, data shuffle, framework-level)
+  - `hardware` — machine / GPU type and count
+  - `dataset_version` — dataset name, split, version tag or file hash
+  - `metrics_path` — path to the file containing the reported numbers
+  - `log_path` — path to the raw training / evaluation log
+- **Accepted designs must be implemented.** Every accepted design used for claims
+  or experiments must be implemented and run. The paper describes the code that
+  *exists*, not the code you wish existed. Before a method claim ships, point to
+  the implementation and the run that exercised it. Exploratory designs and rejected
+  alternatives must be explicitly marked `[speculative]` or `[rejected]` in the
+  design docs — they must not appear in the paper as if implemented.
 - **Design / experiments / formulas: both must confirm (双方确认).** Every design
   choice, experimental protocol, and formula is confirmed by BOTH an independent
   refutation subagent AND a codex cross-analysis. Agreement of *both* is the bar; if
@@ -164,16 +174,32 @@ to paper over.
    `STATE.md`, `plan.md`, and `TODO.md`.
 3. **Open or create TODO.md.** Read `.research/TODO.md`. If it doesn't exist,
    bootstrap it with the format defined in the [Todolist](#todolist) section — one
-   entry per step already known from `plan.md`, all in `QUEUED` initially. This
+   entry per step already known from `plan.md`, all as `[ ]` initially. This
    file is your running task board and must stay in sync with reality at all times.
+3b. **Recover stale tasks.** Scan TODO.md for any `[~]` (in-progress) items left
+    from a prior session. For each, check whether its artifact path exists on disk.
+    If the artifact exists and looks complete, mark it `[x]` with a note
+    "resumed: artifact found". If the artifact is missing or truncated, mark it
+    `[!]` and add it to **Open questions**. Surface all ambiguous cases to the user
+    before continuing.
+3c. **Check artifact integrity.** For every `[x]` task that STATE.md or plan.md
+    treats as load-bearing, verify the artifact path exists on disk. If any are
+    missing, downgrade to `[!]` in TODO.md and flag the claim as `unverified` in
+    the ledger — it cannot drive downstream work until re-run or user sign-off.
 4. **Reconcile.** Compare what `STATE.md` says against reality (git log, files on
    disk, the user's message). If they disagree, surface it — don't blindly trust
    the state file. Update both `STATE.md` and `TODO.md` to match reality.
-3b. **Run the competitive intelligence sweep** if `STATE.md` does not already record
-    `competitive-sweep: done` (i.e., new project or topic pivot). See the
-    "Competitive intelligence sweep" section below. This must complete — and the
-    positioning map must be written — before you present any direction choice to
-    the user.
+3b. **Run the competitive intelligence sweep** according to the following trigger
+    conditions:
+    - **Mandatory** if `STATE.md` does not already record `competitive-sweep: done`
+      AND the task is a new research direction or a topic pivot. This must complete —
+      and the positioning map must be written — before you present any direction
+      choice to the user.
+    - **Optional / skippable** for tasks that are purely implementation, reproduction
+      of an already-specified method, or already-scoped writing work (e.g. expanding
+      a section from an approved outline). If you skip it, record the reason in
+      `STATE.md` (e.g. `competitive-sweep: skipped — implementation task, direction
+      already locked`). Do not silently omit it without documentation.
 4. **Decide the next step**, then enter the loop below.
 
 Always start by reading the current state. Skills and code evolve between
@@ -243,19 +269,29 @@ benchmarks apply → record the choice in STATE and proceed without stopping.
 Repeat this cycle, in the main thread, without stopping to ask permission for each
 ordinary step — only stop at a human gate (next section):
 
+**Write ownership: the orchestrator is the sole writer to `STATE.md`, `TODO.md`,
+`plan.md`, and `verification-ledger.md`.** Subagents write only to their assigned
+artifact path under `.research/`. The orchestrator reads the summary and artifact,
+then updates the four control files itself. This prevents write races when subagents
+run in parallel.
+
 ```
 1. Read current STATE.md (it's short — that's the point).
-2. Read TODO.md. Pick the next QUEUED task.
-3. Move that task from QUEUED → ACTIVE in TODO.md (update the timestamp line).
+2. Read TODO.md. Pick the next [ ] task.
+3. Move that task [ ] → [~] in TODO.md (add a short context note inline).
 4. Map the task to its research stage → pick the ARIS skill(s) for it
    (see references/stage-skill-map.md).
 5. Dispatch a subagent with: the task, the ARIS skill(s) to invoke,
    the .research/ output path, and the "return only a summary" contract.
-6. Receive the summary. Append it to STATE.md (and decisions/ if a choice
-   was made). DO NOT paste the full artifact into the main thread.
-7. Update TODO.md: move the completed task to DONE with artifact path;
-   move any newly unblocked tasks from BLOCKED → QUEUED;
-   append any new follow-up tasks to QUEUED with the next sequential #N.
+6. Receive the summary. Append it to STATE.md tagged [assumption] — it is
+   PENDING, not verified fact. Promote claims to [verified]/[sourced] only
+   after checking evidence against the artifact (file:line quote, run output,
+   or fetched URL). If a decision was made, append to decisions/ with the same
+   tagging. DO NOT paste the full artifact into the main thread.
+7. Update TODO.md: move the completed task [~] → [x] with artifact path;
+   if the task failed, mark [!] and add to Open questions;
+   move any newly unblocked tasks [ ] that depended on it;
+   append any new follow-up tasks as [ ] with the next sequential #N.
 8. Update plan.md to match.
 9. Is the next step a human gate? If yes → stop and ask. If no → go to 1.
 ```
@@ -296,7 +332,11 @@ irreversible and only the user can resolve it:
   shared server. Confirm first. (Per the user's standing rule: never delete, move,
   or overwrite server files — report and let the user decide.)
 - **Genuine ambiguity** where you cannot infer intent from the project, the code,
-  or sensible defaults, and the answer changes what you build next.
+  or sensible defaults, and the next action would: (a) change the research
+  direction, (b) commit significant compute or cost, (c) require exposing
+  credentials, or (d) produce irreversible external behavior. Ordinary
+  implementation uncertainty — style, structure, minor parameter choices — is not
+  a gate; use sensible defaults and proceed.
 
 Everything else — keep going. "Should I run the next step?" is **not** a gate.
 Batch your questions: if you can already see that two gates are coming, ask both
@@ -344,6 +384,9 @@ ChatGPT's take through the **codex MCP server** (`mcp__codex__codex`).
 - Call it read-only and non-interactive so it can't touch files or stall on
   approvals: pass `sandbox: "read-only"` and `approval-policy: "never"`. Put the
   material to analyze directly in `prompt` (read the file first and inline it).
+  These settings apply only to the `mcp__codex__codex` call itself — they do not
+  constrain the orchestrator's other subagents, which operate under their normal
+  permissions.
 - **Model: use `gpt-5.5` at xhigh reasoning** — pass `model: "gpt-5.5"` and
   `config: {"model_reasoning_effort": "xhigh"}`. (`gpt-5.5-codex` is rejected on
   ChatGPT-auth accounts — if you ever hit a model-not-supported error, fall back to
@@ -432,6 +475,8 @@ _Updated: YYYY-MM-DD | Session N_
 | `[x]` | Done |
 | `[~]` | In progress (add `[bg]` if running as a background subagent) |
 | `[ ]` | Pending |
+| `[!]` | Failed — task ran but produced an error or unusable result |
+| `[?]` | Partial / needs-retry — task completed incompletely or with uncertain output |
 | `🚪` | Human gate — must stop and ask before proceeding |
 
 ### Rules for updating
@@ -440,12 +485,16 @@ _Updated: YYYY-MM-DD | Session N_
 2. **Starting work:** change `[ ]` → `[~]`, add a short context note inline.
 3. **Completing work:** change `[~]` → `[x]`, append outcome + artifact path.
    Move to **Done** section if the item's category section becomes cluttered.
-4. **New decision reached:** append to **Locked decisions** with rationale.
+4. **Failed work:** change `[~]` → `[!]`, append the error or reason it failed.
+   If the task can be retried with a fix, add a new `[ ]` entry for the retry.
+5. **Partial / uncertain work:** change `[~]` → `[?]`, append what is missing or
+   uncertain. Re-queue as `[ ]` once the gap is identified.
+6. **New decision reached:** append to **Locked decisions** with rationale.
    Do NOT delete superseded decisions — strikethrough and note what replaced them.
-5. **New task discovered:** append to the appropriate category subsection.
-6. **New human gate:** add `🚪` item to relevant category AND to **Open questions**.
+7. **New task discovered:** append to the appropriate category subsection.
+8. **New human gate:** add `🚪` item to relevant category AND to **Open questions**.
    When the user answers, remove from Open questions and update the item inline.
-7. **Never rewrite sections you aren't touching.** Edit the minimum — clean git
+9. **Never rewrite sections you aren't touching.** Edit the minimum — clean git
    diffs signal the list is healthy.
 
 The todolist is a **project document**, not just a task tracker. Decisions,
