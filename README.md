@@ -42,18 +42,7 @@ The skill reads `.research/STATE.md`, picks up where you left off, and keeps mov
 
 ## How it works
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                           Main Thread                                │
-│                                                                      │
-│   Read STATE.md → Read TODO.md → Pick next step → Map to ARIS skill │
-│          ↑                                                      │    │
-│          └──── Update STATE + TODO ◄──── ≤200-word summary ◄───┘    │
-│                                              │                       │
-│   Human gate? → Stop and ask.         Subagent writes full           │
-│   Otherwise → loop.                   output to .research/           │
-└──────────────────────────────────────────────────────────────────────┘
-```
+![Architecture diagram showing the research-orchestrator loop: Main Thread hexagon with A→B→C→D inner loop, subagent fan-out to ARIS skills, .research/ workspace, and human gates](assets/architecture.png)
 
 The orchestrator never does research work itself. It decides what happens next, briefs a subagent, and records the outcome. That's the entire job.
 
