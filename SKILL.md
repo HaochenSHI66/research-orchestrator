@@ -161,10 +161,14 @@ to paper over.
 2. **Open or create the workspace.** Read `.research/STATE.md` if it exists — that
    is your memory of where the project stands. If it doesn't exist, create the
    `.research/` layout (see `references/workspace-layout.md`) and write an initial
-   `STATE.md` and `plan.md`.
-3. **Reconcile.** Compare what `STATE.md` says against reality (git log, files on
+   `STATE.md`, `plan.md`, and `TODO.md`.
+3. **Open or create TODO.md.** Read `.research/TODO.md`. If it doesn't exist,
+   bootstrap it with the format defined in the [Todolist](#todolist) section — one
+   entry per step already known from `plan.md`, all in `QUEUED` initially. This
+   file is your running task board and must stay in sync with reality at all times.
+4. **Reconcile.** Compare what `STATE.md` says against reality (git log, files on
    disk, the user's message). If they disagree, surface it — don't blindly trust
-   the state file. Update `STATE.md` to match reality.
+   the state file. Update both `STATE.md` and `TODO.md` to match reality.
 3b. **Run the competitive intelligence sweep** if `STATE.md` does not already record
     `competitive-sweep: done` (i.e., new project or topic pivot). See the
     "Competitive intelligence sweep" section below. This must complete — and the
@@ -241,15 +245,19 @@ ordinary step — only stop at a human gate (next section):
 
 ```
 1. Read current STATE.md (it's short — that's the point).
-2. Pick the next step from plan.md.
-3. Map the step to its research stage → pick the ARIS skill(s) for it
+2. Read TODO.md. Pick the next QUEUED task.
+3. Move that task from QUEUED → ACTIVE in TODO.md (update the timestamp line).
+4. Map the task to its research stage → pick the ARIS skill(s) for it
    (see references/stage-skill-map.md).
-4. Dispatch a subagent with: the task, the ARIS skill(s) to invoke,
+5. Dispatch a subagent with: the task, the ARIS skill(s) to invoke,
    the .research/ output path, and the "return only a summary" contract.
-5. Receive the summary. Append it to STATE.md (and decisions/ if a choice
+6. Receive the summary. Append it to STATE.md (and decisions/ if a choice
    was made). DO NOT paste the full artifact into the main thread.
-6. Update plan.md: mark the step done, add any follow-ups the subagent surfaced.
-7. Is the next step a human gate? If yes → stop and ask. If no → go to 1.
+7. Update TODO.md: move the completed task to DONE with artifact path;
+   move any newly unblocked tasks from BLOCKED → QUEUED;
+   append any new follow-up tasks to QUEUED with the next sequential #N.
+8. Update plan.md to match.
+9. Is the next step a human gate? If yes → stop and ask. If no → go to 1.
 ```
 
 You may dispatch several **independent** subagents in parallel (one message,
@@ -368,11 +376,90 @@ Instruct the subagent roughly:
 For a follow-up turn in the same Codex thread, use `mcp__codex__codex-reply` with
 the returned `threadId`.
 
+## Todolist
+
+`.research/TODO.md` is the single source of truth for task status, locked
+decisions, and open questions. Update it at every loop iteration — it must always
+reflect reality, not lag behind.
+
+### Format
+
+The file has fixed top sections (Goal, Locked decisions, Done, In progress) and
+flexible middle sections whose names match the project's work categories
+(e.g. Experiments, Writing, Figures, Finalize). The Open questions section at the
+bottom is the explicit list of human gates.
+
+```markdown
+# TODO — <project name>
+_Updated: YYYY-MM-DD | Session N_
+
+## Goal & constraints
+- **Target:** [venue / submission / outcome and deadline]
+- **Non-negotiables:** [integrity rules, scope boundaries, hard constraints]
+
+## Locked decisions
+- [decision summary] — [rationale + who/what confirmed it, e.g. "Codex + refutation"]
+- [decision summary] — [rationale]
+
+## Done
+- [x] Item — brief outcome note. `artifact: path/if/any`
+- [x] Item ✓ MM-DD
+
+## In progress
+- [~] Item — what's currently running and immediate target [bg: if background]
+
+## Remaining
+### Experiments
+- [ ] Item — context / what this unblocks
+- 🚪 Item — needs user decision before proceeding
+
+### Writing
+- [ ] Item
+
+### Finalize / submit
+- 🚪 User reviews final draft.
+- 🚪 Submit before deadline.
+
+## Open questions for user
+- Question 1?
+- Question 2?
+```
+
+### Status markers
+
+| Marker | Meaning |
+|--------|---------|
+| `[x]` | Done |
+| `[~]` | In progress (add `[bg]` if running as a background subagent) |
+| `[ ]` | Pending |
+| `🚪` | Human gate — must stop and ask before proceeding |
+
+### Rules for updating
+
+1. **Every session/loop:** update the `_Updated:` line. One edit, two fields.
+2. **Starting work:** change `[ ]` → `[~]`, add a short context note inline.
+3. **Completing work:** change `[~]` → `[x]`, append outcome + artifact path.
+   Move to **Done** section if the item's category section becomes cluttered.
+4. **New decision reached:** append to **Locked decisions** with rationale.
+   Do NOT delete superseded decisions — strikethrough and note what replaced them.
+5. **New task discovered:** append to the appropriate category subsection.
+6. **New human gate:** add `🚪` item to relevant category AND to **Open questions**.
+   When the user answers, remove from Open questions and update the item inline.
+7. **Never rewrite sections you aren't touching.** Edit the minimum — clean git
+   diffs signal the list is healthy.
+
+The todolist is a **project document**, not just a task tracker. Decisions,
+constraints, and open questions live here alongside the work items so everything
+is in one place. Disk is cheap; lost rationale is not.
+
 ## Recording designs and decisions — keep everything
 
 Requirement: nothing is lost. Persist as you go (subagents write; you index):
 
-- `plan.md` — the living master plan. Steps, status, follow-ups.
+- `TODO.md` — the running task board. Updated every loop iteration. See the
+  [Todolist](#todolist) section for format and rules.
+- `plan.md` — the living master plan. High-level steps and milestones; TODO.md
+  is the granular task view that stays in sync with it.
 - `STATE.md` — short current-state snapshot you keep updating. The first thing any
   session reads.
 - `designs/` — every design doc, proposal, method writeup. Versioned by filename
