@@ -84,6 +84,129 @@ This contract is what keeps the main thread clean. A subagent's full notes, code
 
 ---
 
+## Design principles
+
+Every concern below is enforced at runtime — gates block progress, loops update state, and the workspace records everything. Click the reference link to read the full specification.
+
+---
+
+### Evidence-gating — nothing enters STATE as fact without proof
+
+The most common failure in AI-assisted research: a subagent asserts something, the orchestrator records it, and the error propagates invisibly for 10 more steps. This skill treats every subagent summary as a claim, not proof.
+
+- All load-bearing claims tagged `[verified: file:line]`, `[sourced: url]`, or `[assumption: model-prior]`
+- Every claim tracked in `verification-ledger.md`; status stays `unverified` until evidence is supplied
+- **Hard no-pass gate**: no expensive or irreversible action (compute, push, submit) proceeds while any claim it depends on is unverified or refuted
+- An `[assumption]` may never be silently promoted to fact — it becomes a human gate
+
+→ `SKILL.md` § *The second rule: evidence over assertion* · `SKILL.md` § *The verification ledger and the no-pass gate*
+
+---
+
+### Citation PDF verification — every reference is downloaded and checked
+
+Most tools trust abstracts or metadata. This skill runs a four-gate pipeline on every citation before it can appear in a draft.
+
+- Resolve via DOI / arXiv / Semantic Scholar to canonical paper
+- Fuzzy-match title, authors, year for metadata integrity
+- Download the actual PDF (via Unpaywall or open-access sources)
+- Extract text and confirm the specific claim the citation is meant to support
+- Five outcomes: `VERIFIED`, `EXISTS-BUT-UNCHECKED`, `METADATA-MISMATCH`, `CLAIM-UNSUPPORTED`, `NOT-FOUND` — a draft never ships with anything other than `VERIFIED`
+
+→ `SKILL.md` § *References: download and verify* · [`references/citation-verification.md`](references/citation-verification.md)
+
+---
+
+### ChatGPT cross-analysis — adversarial second opinion for high-stakes decisions
+
+For decisions where a wrong answer costs weeks (is this novel? is this design sound? does this claim follow from the results?), a second independent model is more valuable than another pass from the same one.
+
+- Runs via the **codex MCP server** inside a subagent — exchange never lands in the main thread
+- Model: `gpt-5.5`, reasoning effort: `xhigh` — strongest available reviewer, not a quick sanity check
+- Prompted to **refute**, not praise — disagreement is the signal, not a problem to resolve away
+- Required (not optional) for any soundness claim: design, formula, experimental protocol, novelty assertion
+- Method/design choices need **both** an independent refutation subagent AND this codex cross-analysis to pass
+
+→ `SKILL.md` § *ChatGPT cross-analysis* · `SKILL.md` § *Design / experiments / formulas: both must confirm*
+
+---
+
+### Human gates — autonomous loop with hard stops at irreversible decisions
+
+The skill loops without interruption through ordinary work. It stops only when a wrong guess cannot be corrected cheaply.
+
+| Gate | Trigger |
+|------|---------|
+| Direction choice | Multiple viable directions; choice changes everything downstream |
+| Benchmark protocol | No existing benchmark measures the claimed contribution |
+| Missing credential | API key, dataset token, cluster login, codex MCP auth |
+| Interactive auth | Browser or terminal login required (OAuth, 2FA, `gcloud auth login`) |
+| Irreversible action | Delete, push, submit, spend — any action that can't be undone |
+| Unverified claim | Ledger has an open item a planned step depends on |
+
+Multiple visible gates are batched into one question. Session state is written clean before every stop so the next turn or session can resume exactly.
+
+→ `SKILL.md` § *Human gates — the only reasons to stop*
+
+---
+
+### Clean main thread — the orchestrator never does the work
+
+The main conversation handles one thing: deciding what happens next. Every execution task is a subagent.
+
+- Each subagent gets a self-contained brief with context, task, ARIS skill to invoke, and output path
+- Subagent returns ≤200-word summary + artifact paths + evidence; full output stays on disk in `artifacts/`
+- Independent tasks fan out in a single message (parallel dispatch); dependent tasks run sequentially
+- Research stages map to ARIS skills automatically via `stage-skill-map.md` — the orchestrator follows the map, not ad-hoc choices
+
+→ `SKILL.md` § *The one rule that makes this work* · `SKILL.md` § *Dispatching a subagent — template* · [`references/stage-skill-map.md`](references/stage-skill-map.md)
+
+---
+
+### Persistent workspace + running TODO — single source of truth across all sessions
+
+Every session starts by reading state, not by asking the user what's going on.
+
+- `STATE.md` — reconciled against `git log` and disk on every session start; disagreements surfaced before any work begins
+- `TODO.md` — updated every loop iteration with `[x]` / `[~]` / `[ ]` / 🚪 status, locked decisions with rationale, and open questions for the user
+- Superseded decisions are struck through and annotated, never deleted — the history of what was tried and rejected is part of the record
+- Design docs versioned by filename (`v1.md`, `v2.md`) and never overwritten in place
+- `decisions/` holds one entry per human-gate decision: the options considered, the choice made, and why
+
+→ `SKILL.md` § *Todolist* · `SKILL.md` § *Recording designs and decisions* · [`references/workspace-layout.md`](references/workspace-layout.md)
+
+---
+
+### Competitive intelligence sweep — no direction chosen blind
+
+Before committing to any research direction (or after a topic pivot), the skill runs a mandatory literature sweep and presents a positioning map.
+
+- Identifies top 2–3 venues for the area
+- Fans out 3–5 parallel subagents across keyword angles using `aris-semantic-scholar`, `aris-openalex`, `aris-arxiv`; each downloads PDFs
+- One subagent per paper extracts contribution, method, benchmarks, results, limitations
+- Synthesis subagent builds a contribution-space table with an explicit verdict: *direct overlap* / *competitive risk* / *gap filler* / *novel axis*
+- Direction choice is always a human gate — positioning map presented first, never picked silently
+- Benchmark decision flows from the map: existing benchmarks reused by default; deviation requires documented justification
+
+→ `SKILL.md` § *Competitive intelligence sweep — mandatory before any direction gate*
+
+---
+
+### Venue-standard quality + figure discipline — held to NeurIPS/ICML/CVPR/ACL bar
+
+Every project is held to the submission standards of a top CS venue. These are gates, not aspirations.
+
+- Every design constant needs a derivation, or a sensitivity sweep + ablation; if neither exists, that's a finding, not a detail
+- Gains attributed to tuning or compute (not the idea) are flagged and separated
+- Single-run results, weak baselines, data leakage, missing closest prior work, and overclaiming are all caught by the reviewer-attack checklist before the writing stage
+- All figures produced via the `paper-plot-from-data` skill for consistent style and palette across the paper
+- Every paper targets a diverse set of figure types: schematic, quantitative, ablation, qualitative/failure, convergence — not repetitive
+- Tables follow the LaTeX template in `figure-discipline.md`: booktabs, no vertical rules, `\rowcolor` for proposed method, captions above
+
+→ `SKILL.md` § *Held to top CS-venue standards* · [`references/reviewer-attack-checklist.md`](references/reviewer-attack-checklist.md) · [`references/figure-discipline.md`](references/figure-discipline.md)
+
+---
+
 ## Evidence system
 
 One of the most common ways AI-assisted research goes wrong: a subagent asserts something, the orchestrator records it as fact, and the error propagates invisibly through every downstream step.
